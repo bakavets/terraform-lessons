@@ -24,7 +24,7 @@ provider "aws" {
       "Team"            = "DevOps",
       "DeployedBy"      = "Terraform",
       "Application"     = "Terraform Backend",
-      "OwnerEmail"      = "devops@example.com"
+      "OwnerEmail"      = "devopss@example.com"
     }
   }
 }
