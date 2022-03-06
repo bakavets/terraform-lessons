@@ -9,8 +9,6 @@ on:
   pull_request:
     branches:
       - master
-    paths:
-      - 'aws/backend/**'
 
 jobs:
   terraform:
