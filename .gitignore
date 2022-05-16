@@ -79,3 +79,6 @@ Thumbs.db
 
 # SSH Keys
 *.pem
+
+# terragrunt cache directories
+**/.terragrunt-cache/*
