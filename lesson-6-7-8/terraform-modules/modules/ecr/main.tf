@@ -5,6 +5,9 @@ resource "aws_ecr_repository" "template" {
     encryption_type = "KMS"
     kms_key         = var.kms_key_id
   }
+  image_scanning_configuration {
+    scan_on_push = true
+  }
   tags = {
     "Name"        = var.ecr_name
     "Type"        = "Elastic Container Registry"

@@ -1,6 +1,6 @@
 locals {
-  source_url        = "git::git@gitlab.com:bakavets/terraform-modules.git"
-  source_version    = "v0.1.0"
+  source_url        = "git::https://gitlab.com/bakavets/terraform-modules.git"
+  source_version    = "v0.2.1"
   deployment_prefix = "main-dev"
   aws_region        = "eu-central-1"
   eks_cluster_name  = "${local.deployment_prefix}-eks-cluster"

@@ -1,0 +1,132 @@
+variables:
+  WORKING_DIRECTORY: dev/main
+  TF_PLUGIN_CACHE_DIR: $CI_PROJECT_DIR/plugin-cache
+  AWS_ACCESS_KEY_ID: $TF_MAIN_DEV_AWS_ACCESS_KEY_ID
+  AWS_SECRET_ACCESS_KEY: $TF_MAIN_DEV_AWS_SECRET_ACCESS_KEY
+  TF_VAR_my_password: $DEMO_SECRET
+  TERRAGRUNT_PARALLELISM: 5
+
+stages:
+  - plan
+  - apply
+
+image:
+  name: bakavets/alpine-terragrunt-awscli2-kubectl:1.2.7
+
+.common_config:
+  before_script:
+    - mkdir $TF_PLUGIN_CACHE_DIR
+    - cd $WORKING_DIRECTORY
+    - git config --global url."https://foo:${GITLAB_TOKEN_BOT}@gitlab.com".insteadOf "https://gitlab.com"
+  script:
+    - terragrunt hclfmt --terragrunt-check
+    - terragrunt run-all providers lock -platform=linux_amd64
+    - terragrunt run-all validate
+
+terragrunt-plan:
+  before_script:
+    - !reference [.common_config, before_script]
+    - curl -fsSL https://raw.githubusercontent.com/infracost/infracost/master/scripts/install.sh | sh
+  stage: plan
+  script:
+    - !reference [.common_config, script]
+    # https://www.infracost.io/docs/troubleshooting/#terragrunt
+    - |
+
+      # Generate plan JSON files for all Terragrunt modules and add them to an Infracost config file
+      terragrunt run-all plan -no-color -out tfplan.binary | tee -a pre-plan.txt
+
+      # Find the plan files
+      plans=($(find . -name tfplan.binary))
+
+      # Generate plan JSON files by running terragrunt show for each plan file
+      planjsons=()
+      for plan in "${plans[@]}"; do
+        # Find the Terraform working directory for running terragrunt show
+        # We want to take the dir of the plan file and strip off anything after the .terraform-cache dir
+        # to find the location of the Terraform working directory that contains the Terraform code
+        dir=$(dirname $plan)
+        dir=$(echo "$dir" | sed 's/\(.*\)\/\.terragrunt-cache\/.*/\1/')
+
+        # Customize this to how you run Terragrunt
+        echo "Running terragrunt show for $(basename $plan) for $dir"
+        terragrunt show -json $(basename $plan) --terragrunt-working-dir=$dir --terragrunt-no-auto-init > $dir/plan.json
+        planjsons=(${planjsons[@]} "$dir/plan.json")
+      done
+
+      # Sort the plan JSONs so we get consistent project ordering in the config file
+      IFS=$'\n' planjsons=($(sort <<<"${planjsons[*]}"))
+
+      # Generate Infracost config file
+      echo -e "version: 0.1\n\nprojects:\n" > infracost-generated.yml
+      for planjson in "${planjsons[@]}"; do
+        echo -e "  - path: $planjson" >> infracost-generated.yml
+      done
+
+      # Infracost CLI commands can be run now
+      infracost breakdown --config-file=infracost-generated.yml --format=json --out-file=/tmp/infracost.json
+
+    # Posts a comment to the PR using the 'update' behavior.
+    # This creates a single comment and updates it. The "quietest" option.
+    # The other valid behaviors are:
+    #   update - Create a single comment and update it. The "quietest" option.
+    #   delete-and-new - Delete previous comments and create a new one.
+    #   new - Create a new cost estimate comment on every push.
+    # See https://www.infracost.io/docs/features/cli_commands/#comment-on-pull-requests for other options.
+    - |
+      infracost comment gitlab --path=/tmp/infracost.json \
+                               --repo=$CI_PROJECT_PATH \
+                               --merge-request=$CI_MERGE_REQUEST_IID \
+                               --gitlab-server-url=$CI_SERVER_URL \
+                               --gitlab-token=$GITLAB_TOKEN_BOT \
+                               --behavior=new
+    - MESSAGE=$(cat pre-plan.txt)
+    - >-
+      cat <<EOF >> plan.txt
+
+      ###### Terragrunt Status:
+
+      <details><summary>Show Plan</summary>
+
+
+      \`\`\`bash$MESSAGE
+
+      \`\`\`
+
+      </details>
+
+
+      Results for commit: $CI_COMMIT_SHA
+
+
+      *Pusher:* **_\`\`\`$CI_COMMIT_AUTHOR\`\`\`_**,\\
+
+      *Working Directory:* **_\`\`\`$WORKING_DIRECTORY\`\`\`_**,\\
+
+      *Job name:* **_\`\`\`$CI_JOB_NAME\`\`\`_**,\\
+
+      *Terraform version:* **_\`\`\`$(terraform --version -json)\`\`\`_**,\\
+
+      *Terragrunt version:* **_\`\`\`$(terragrunt --version)\`\`\`_**,\\
+
+      *Infracost version:* **_\`\`\`$(infracost --version)\`\`\`_**,\\
+
+      *AWS CLI version:* **_\`\`\`$(aws --version)\`\`\`_**
+
+      EOF
+    - >-
+      curl -X POST -g -H "PRIVATE-TOKEN: ${GITLAB_TOKEN_BOT}"
+      --data-urlencode "body@plan.txt"
+      "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/merge_requests/${CI_MERGE_REQUEST_IID}/discussions"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == $CI_DEFAULT_BRANCH
+
+terragrunt-apply:
+  before_script:
+    - !reference [.common_config, before_script]
+  stage: apply
+  script:
+    - !reference [.common_config, script]
+    - terragrunt run-all apply --terragrunt-non-interactive
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

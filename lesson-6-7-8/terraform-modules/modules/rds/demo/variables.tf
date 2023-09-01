@@ -79,5 +79,17 @@ variable "multi_az" {
 variable "deletion_protection" {
   description = "The database can't be deleted when this value is set to true"
   type        = bool
+  default     = true
+}
+
+variable "performance_insights_enabled" {
+  description = "Specifies whether Performance Insights are enabled"
+  type        = bool
   default     = false
+}
+
+variable "my_password" {
+  description = "My password"
+  type        = string
+  sensitive   = true
 }

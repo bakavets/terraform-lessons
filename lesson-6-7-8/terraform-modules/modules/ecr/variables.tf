@@ -11,6 +11,7 @@ variable "ecr_name" {
 variable "image_tag_mutability" {
   description = "The tag mutability setting for the repository. Must be one of: MUTABLE or IMMUTABLE"
   type        = string
+  default     = "IMMUTABLE"
 }
 
 variable "kms_key_id" {

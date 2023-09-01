@@ -21,11 +21,11 @@ resource "random_password" "master_password" {
 }
 
 resource "aws_secretsmanager_secret" "demo" {
-  name        = "${var.deployment_prefix}-demo-myrds"
+  name        = "${var.deployment_prefix}-demo-myrds-db"
   description = "Demo credentials like Database password etc. for ${var.deployment_prefix} environment."
   kms_key_id  = var.kms_key_id
   tags = {
-    "Name" = "${var.deployment_prefix}-demo-myrds"
+    "Name" = "${var.deployment_prefix}-demo-myrds-db"
     "Type" = "Secrets Manager"
   }
 }
@@ -38,6 +38,7 @@ resource "aws_secretsmanager_secret_version" "demo" {
     MYSQL_DATABASE = local.db_name
     MYSQL_HOST     = module.demo.db_instance_address
     MYSQL_PORT     = module.demo.db_instance_port
+    SUPER_SECRET   = var.my_password
   })
 }
 
@@ -47,6 +48,7 @@ resource "aws_secretsmanager_secret_version" "demo" {
 
 resource "aws_security_group" "demo" {
   name_prefix = "${var.deployment_prefix}-demo-rds-sg"
+  description = "What does this rule enable"
   vpc_id      = var.vpc_id
   tags = {
     Name = "${var.deployment_prefix}-demo-rds-sg"
@@ -86,11 +88,12 @@ module "demo" {
   identifier = local.db_instance_identifier
 
   # All available versions: http://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_MySQL.html#MySQL.Concepts.VersionMgmt
-  engine               = var.engine
-  engine_version       = var.engine_version
-  family               = var.family
-  major_engine_version = var.major_engine_version
-  instance_class       = var.instance_class
+  engine                       = var.engine
+  engine_version               = var.engine_version
+  family                       = var.family
+  major_engine_version         = var.major_engine_version
+  instance_class               = var.instance_class
+  performance_insights_enabled = var.performance_insights_enabled
 
   storage_type          = "gp3"
   allocated_storage     = var.allocated_storage

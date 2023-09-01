@@ -54,7 +54,7 @@ module "eks" {
   }
 
   tags = {
-    "Name"            = "${local.cluster_name}"
+    "Name"            = local.cluster_name
     "Type"            = "Kubernetes Service"
     "K8s Description" = "Kubernetes for deployment related to ${var.deployment_prefix}"
   }

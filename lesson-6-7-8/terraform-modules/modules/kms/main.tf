@@ -4,6 +4,7 @@ resource "aws_kms_key" "kms_deployment_key" {
   description              = "AWS KMS key used to encrypt AWS resources (e.g. Volumes, EKS Secrets, etc.)."
   key_usage                = "ENCRYPT_DECRYPT"
   customer_master_key_spec = "SYMMETRIC_DEFAULT"
+  enable_key_rotation      = true
   # The following snippet shows the policy statement that gives an example AWS account full access to a KMS key. This policy statement lets the account use IAM policies, along with key policies, to control access to the KMS key.
   policy = <<EOT
 {
